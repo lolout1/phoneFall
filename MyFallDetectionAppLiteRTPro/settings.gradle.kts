@@ -8,7 +8,6 @@ pluginManagement {
 dependencyResolutionManagement {
     versionCatalogs {
         create("libs") {
-            // We'll reference versions in gradle/libs.versions.toml
             from(files("gradle/libs.versions.toml"))
         }
     }
@@ -17,5 +16,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "MyFallDetectionAppLiteRT"
+rootProject.name = "MyFallDetectionAppLiteRTPro"
 include(":app")
