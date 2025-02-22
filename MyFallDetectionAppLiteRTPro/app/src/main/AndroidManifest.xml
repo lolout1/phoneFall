@@ -1,30 +1,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="com.example.myfalldetectionapplitert">
+    package="com.example.myfalldetectionapplitertpro">
 
-    <!-- Request accelerometer -->
     <uses-feature
         android:name="android.hardware.sensor.accelerometer"
         android:required="true" />
 
-    <!-- (Optional) If you want external logging, also request permissions for older devices -->
+    <!-- For writing logs to /Android/data/<package>/files/fall_logs.txt on older devices -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-                     android:maxSdkVersion="28"/>
+                     android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-                     android:maxSdkVersion="28"/>
+                     android:maxSdkVersion="28" />
 
     <application
         android:allowBackup="true"
-        android:label="MyFallDetectionAppLiteRT"
+        android:label="MyFallDetectionAppLiteRTPro"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+        android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar">
 
-        <activity android:name=".MainActivity"
-                  android:exported="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
+                <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
     </application>
+
 </manifest>
