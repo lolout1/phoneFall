@@ -1,6 +1,7 @@
 plugins {
-    alias(libs.plugins.androidApplication)
-    alias(libs.plugins.jetbrainsKotlinAndroid)
+    // Apply the plugins we declared at the top level:
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -9,47 +10,44 @@ android {
 
     defaultConfig {
         applicationId = "com.example.myfalldetectionapplitertpro"
-        minSdk = 24
+        minSdk = 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-
-        multiDexEnabled = true
-        vectorDrawables {
-            useSupportLibrary = true
-        }
-    }
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
     }
 
+    // Optional: enable ViewBinding or Compose, etc.
+    buildFeatures {
+        viewBinding = true
+    }
+
+    // Java/Kotlin compatibility
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.constraintlayout)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
+    // AndroidX basics
+    implementation(libs.core.ktx)
+    implementation(libs.appcompat)
+    implementation(libs.constraintlayout)
+    implementation(libs.lifecycle.runtime.ktx)
 
-    // TFLite LiteRT
+    // TFLite LiteRT dependencies
     implementation(libs.litert)
     implementation(libs.litert.support)
     implementation(libs.litert.metadata)
 
+    // Unit tests
     testImplementation(libs.junit)
+
+    // Instrumented tests
     androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.espresso.core)
 }

@@ -21,16 +21,7 @@ import kotlin.math.exp
 import kotlin.system.measureTimeMillis
 
 /**
- * A robust solution for real-time fall detection with:
- *   - 4s window, ~30ms sampling => ~133 samples
- *   - Uniform downsample to 128 if >128, discard if <128
- *   - 1s stride
- *   - LiteRT for TFLite
- *   - Start button -> sets "Activated!"
- *   - A live stopwatch in ms
- *   - A prediction counter
- *   - Probability readout after each inference
- *   - Logging of model inputs + outputs
+ * A robust solution for real-time fall detection with TFLite LiteRT integration.
  */
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
@@ -63,7 +54,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var startTimeMs: Long = 0
     private var predictionCount = 0
 
-    // We'll use a Handler to update the stopwatch every 100 ms or so
+    // We'll use a Handler to update the stopwatch
     private val mainHandler = Handler(Looper.getMainLooper())
     private val updateStopwatchTask = object : Runnable {
         override fun run() {
@@ -77,7 +68,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContentView(R.layout.activity_main)
 
         // UI
@@ -115,16 +105,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             tvPredCount.text = "Predictions: 0"
             tvPrediction.text = "No predictions yet"
             tvProbability.text = "Last Probability: -"
-            // Start updating stopwatch
             mainHandler.post(updateStopwatchTask)
 
-            // Register sensor listener now
+            // Register sensor listener
             accelerometer?.also {
                 sensorManager.registerListener(this, it, sensorDelayUs)
             }
         } else {
-            // If it's already running, you could implement a "Stop" or "Restart" logic. 
-            // For now, let’s do a "Stop" logic:
+            // Stop
             isRunning = false
             tvActivated.text = "Not Activated"
             sensorManager.unregisterListener(this)
@@ -133,12 +121,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onResume() {
         super.onResume()
-        // If user wants the sensor active only after pressing Start, do nothing here
+        // If collecting only after Start press, do nothing
     }
 
     override fun onPause() {
         super.onPause()
-        // if still running, we can keep collecting or pause
         sensorManager.unregisterListener(this)
         isRunning = false
     }
@@ -162,30 +149,31 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun checkWindow() {
         if (sampleQueue.isEmpty()) return
         val oldestNs = sampleQueue.first().timeNs
         val newestNs = sampleQueue.last().timeNs
-        val elapsedSec = (newestNs - oldestNs)/1_000_000_000.0f
+        val elapsedSec = (newestNs - oldestNs) / 1_000_000_000.0f
 
         if (elapsedSec >= windowDurationSec) {
             // We have >=4s of data
-            val cutoffNs = oldestNs + (windowDurationSec*1_000_000_000L)
+            val cutoffNs = oldestNs + (windowDurationSec * 1_000_000_000L)
             val windowSamples = sampleQueue.filter { it.timeNs <= cutoffNs }
             if (windowSamples.size < targetCount) {
                 // discard
-                logMsg("[DEBUG] Window has only ${windowSamples.size}<${targetCount}, discarding.")
+                logMsg("[DEBUG] Window has only ${windowSamples.size} < $targetCount, discarding.")
             } else {
-                val finalSamples =
-                    if (windowSamples.size > targetCount)
-                        uniformDownsample(windowSamples, targetCount)
-                    else windowSamples
+                val finalSamples = if (windowSamples.size > targetCount) {
+                    uniformDownsample(windowSamples, targetCount)
+                } else {
+                    windowSamples
+                }
                 doInference(finalSamples)
             }
             // remove everything up to oldestNs + 1s
-            val removeNs = oldestNs + (strideSec*1_000_000_000L)
+            val removeNs = oldestNs + (strideSec * 1_000_000_000L)
             sampleQueue.removeAll { it.timeNs <= removeNs }
         }
     }
@@ -194,7 +182,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val n = data.size
         val out = mutableListOf<AccelSample>()
         for (i in 0 until target) {
-            val idxF = i.toFloat() * (n-1) / (target-1)
+            val idxF = i.toFloat() * (n - 1) / (target - 1)
             out.add(data[idxF.toInt()])
         }
         return out
@@ -212,27 +200,24 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             accelData[i][0] = s.x
             accelData[i][1] = s.y
             accelData[i][2] = s.z
-            timeData[i] = (s.timeNs - firstNs)/1_000_000_000.0f
+            timeData[i] = (s.timeNs - firstNs) / 1_000_000_000.0f
         }
 
+        // Perform inference with TFLite LiteRT
         val logits = tflHelper.predict(accelData, timeData, maskData)
         val probs = softmax(logits)
         val pFall = probs[1]
         val isFall = (pFall > 0.5f)
 
-        // update UI
+        // UI updates
         predictionCount++
         runOnUiThread {
             tvPredCount.text = "Predictions: $predictionCount"
-            if (isFall) {
-                tvPrediction.text = "FALL DETECTED!"
-            } else {
-                tvPrediction.text = "No Fall"
-            }
+            tvPrediction.text = if (isFall) "FALL DETECTED!" else "No Fall"
             tvProbability.text = "Last Probability: %.3f".format(pFall)
         }
 
-        // log
+        // Log
         logWindow(samples, logits)
     }
 
@@ -252,8 +237,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
                 val firstNs = samples.first().timeNs
                 for (s in samples) {
-                    val dtSec = (s.timeNs - firstNs)/1_000_000_000.0f
-                    val line = String.format(Locale.US, "%8.5f, %.5f, %.5f, %.5f\n",
+                    val dtSec = (s.timeNs - firstNs) / 1_000_000_000.0f
+                    val line = String.format(
+                        Locale.US,
+                        "%8.5f, %.5f, %.5f, %.5f\n",
                         dtSec, s.x, s.y, s.z
                     )
                     fos.write(line.toByteArray())
@@ -261,7 +248,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 val outLine = "Model logits=%.5f, %.5f\n\n".format(logits[0], logits[1])
                 fos.write(outLine.toByteArray())
             }
-        } catch (ex: Exception){
+        } catch (ex: Exception) {
             ex.printStackTrace()
         }
     }
@@ -270,9 +257,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         if (Build.VERSION.SDK_INT < 29) {
             val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
             if (ContextCompat.checkSelfPermission(this, permission)
-                != PackageManager.PERMISSION_GRANTED) {
+                != PackageManager.PERMISSION_GRANTED
+            ) {
                 ActivityCompat.requestPermissions(this, arrayOf(permission), 123)
             }
+        }
+    }
+
+    private fun logMsg(msg: String) {
+        try {
+            FileOutputStream(logFile, true).use { fos ->
+                fos.write(("$msg\n").toByteArray())
+            }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
         }
     }
 

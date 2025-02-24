@@ -5,11 +5,13 @@
         android:name="android.hardware.sensor.accelerometer"
         android:required="true" />
 
-    <!-- For writing logs to /Android/data/<package>/files/fall_logs.txt on older devices -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-                     android:maxSdkVersion="28" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-                     android:maxSdkVersion="28" />
+    <!-- For writing logs on older devices (maxSdkVersion=28) -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:allowBackup="true"

@@ -1,19 +1,35 @@
-[plugins]
-androidApplication = { id = "com.android.application", version = "8.1.1" }
-jetbrainsKotlinAndroid = { id = "org.jetbrains.kotlin.android", version = "1.8.22" }
+[versions]
+androidx-core = "1.12.0"
+appcompat = "1.6.1"
+constraintlayout = "2.1.4"
+lifecycle-runtime = "2.7.0"
+junit = "4.13.2"
+androidx-junit = "1.1.5"
+espresso-core = "3.5.1"
+
+# TensorFlow Lite LiteRT libraries
+litert = "0.5.0"
+litert-support = "0.5.0"
+litert-metadata = "0.5.0"
+
+# Plugin versions
+android-gradlePlugin = "8.3.0"
+kotlin-gradlePlugin = "1.9.22"
 
 [libraries]
-androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.12.0" }
-androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.6.1" }
-androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version = "2.1.4" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version = "2.6.2" }
+core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle-runtime" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-junit" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso-core" }
 
-litert = { group = "org.tensorflow.lite.android", name = "litert", version = "2.14.0" }
-litert-support = { group = "org.tensorflow.lite.android", name = "litert-support", version = "2.14.0" }
-litert-metadata = { group = "org.tensorflow.lite.android", name = "litert-metadata", version = "2.14.0" }
+# TFLite LiteRT
+litert = { module = "org.tensorflow:tensorflow-lite-api", version.ref = "litert" }
+litert-support = { module = "org.tensorflow:tensorflow-lite-support", version.ref = "litert-support" }
+litert-metadata = { module = "org.tensorflow:tensorflow-lite-metadata", version.ref = "litert-metadata" }
 
-junit = { group = "junit", name = "junit", version = "4.13.2" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version = "1.1.5" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version = "3.5.1" }
-
-[versions]
+[plugins]
+android-application = { id = "com.android.application", version.ref = "android-gradlePlugin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin-gradlePlugin" }

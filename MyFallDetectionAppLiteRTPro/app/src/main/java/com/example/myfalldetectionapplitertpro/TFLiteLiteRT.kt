@@ -5,18 +5,19 @@ import org.tensorflow.lite.litert.JavaLiteRT
 import org.tensorflow.lite.litert.TensorDataType
 
 /**
- * This helper loads the TFLite model using LiteRT (JavaLiteRT).
- * The model expects 3 inputs:
- *   0 => accel_seq: float32[1, T, 3]
- *   1 => accel_mask: bool[1, T]
- *   2 => accel_time: float32[1, T]
- * output => [1, 2] float32
+ * Helper that loads TFLite model via LiteRT and does a prediction.
+ * Expects 3 inputs:
+ *   #0 => float32[1, T, 3]   (accel)
+ *   #1 => bool[1, T]        (mask)
+ *   #2 => float32[1, T]     (time)
+ * Produces output => float32[1, 2]
  */
 class TFLiteLiteRT(context: Context, modelFileName: String) {
 
     private val litert: JavaLiteRT
 
     init {
+        // Load model from assets
         val assetFd = context.assets.openFd(modelFileName)
         litert = JavaLiteRT.createFromFileDescriptor(
             assetFd.fileDescriptor,
@@ -27,12 +28,13 @@ class TFLiteLiteRT(context: Context, modelFileName: String) {
     }
 
     fun predict(
-        accelData: Array<FloatArray>,  // shape (T,3)
-        timeData: FloatArray,          // shape (T)
-        maskData: BooleanArray         // shape (T)
+        accelData: Array<FloatArray>,   // shape (T,3)
+        timeData: FloatArray,           // shape (T)
+        maskData: BooleanArray          // shape (T)
     ): FloatArray {
         val T = accelData.size
-        val accelSeq = Array(1) { Array(T){ FloatArray(3) } }
+        // Expand dims to [1, T, ...]
+        val accelSeq = Array(1) { Array(T) { FloatArray(3) } }
         val timeSeq  = Array(1) { FloatArray(T) }
         val boolMask = Array(1) { BooleanArray(T) }
 
@@ -44,18 +46,19 @@ class TFLiteLiteRT(context: Context, modelFileName: String) {
             boolMask[0][i] = maskData[i]
         }
 
-        // set inputs
+        // Set inputs
         litert.setInput(0, accelSeq, TensorDataType.FLOAT32)
-        litert.setInput(1, boolMask,  TensorDataType.BOOL)
-        litert.setInput(2, timeSeq,   TensorDataType.FLOAT32)
+        litert.setInput(1, boolMask, TensorDataType.BOOL)
+        litert.setInput(2, timeSeq, TensorDataType.FLOAT32)
 
-        // prepare output => shape (1,2)
+        // Prepare output => shape (1,2)
         val outData = Array(1) { FloatArray(2) }
         litert.setOutput(0, outData, TensorDataType.FLOAT32)
 
-        // run
+        // Run inference
         litert.runInference()
 
-        return outData[0] // shape [2]
+        // Return logits
+        return outData[0]
     }
 }
