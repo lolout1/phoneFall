@@ -1,0 +1,23 @@
+[versions]
+android-gradlePlugin = "8.8.1"
+kotlin-gradlePlugin = "1.8.22"
+
+androidx-core = "1.12.0"
+appcompat = "1.6.1"
+constraintlayout = "2.1.4"
+lifecycle-runtime = "2.7.0"
+
+material = "1.12.0"
+litertSupportApi = "1.1.2"
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "android-gradlePlugin" }
+kotlin-android      = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin-gradlePlugin" }
+
+[libraries]
+core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle-runtime" }
+material = { module = "com.google.android.material:material", version.ref = "material" }
+litert-support-api = { group = "com.google.ai.edge.litert", name = "litert-support-api", version.ref = "litertSupportApi" }

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/activity_main_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- Status text: "Activated" / "Not Activated" -->
+    <TextView
+        android:id="@+id/tvActivated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Not Activated"
+        android:textSize="18sp"
+        android:padding="4dp" />
+
+    <!-- Stopwatch display -->
+    <TextView
+        android:id="@+id/tvStopwatch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stopwatch: 0 ms"
+        android:textSize="16sp"
+        android:padding="4dp" />
+
+    <!-- Current prediction label (e.g., "FALL DETECTED" or "No Fall") -->
+    <TextView
+        android:id="@+id/tvPrediction"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Waiting..."
+        android:textSize="16sp"
+        android:padding="4dp" />
+
+    <!-- Probability display -->
+    <TextView
+        android:id="@+id/tvProbability"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Probability: -"
+        android:textSize="16sp"
+        android:padding="4dp" />
+
+    <!-- Button to start/stop sensor capture -->
+    <Button
+        android:id="@+id/btnStart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="START"
+        android:padding="8dp"
+        android:layout_marginTop="8dp" />
+
+    <!-- Multiline history of predictions (last 8) -->
+    <TextView
+        android:id="@+id/tvPredictionsHistory"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:lines="8"
+        android:scrollbars="vertical"
+        android:inputType="textMultiLine"
+        android:textSize="14sp"
+        android:layout_marginTop="12dp"
+        android:padding="4dp" />
+
+</LinearLayout>
