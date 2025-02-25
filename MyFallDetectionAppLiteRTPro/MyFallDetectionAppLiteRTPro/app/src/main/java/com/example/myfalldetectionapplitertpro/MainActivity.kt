@@ -14,17 +14,21 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import kotlin.math.sqrt
 
-// Data class representing one accelerometer sample.
-data class AccelSample(val timeNs: Long, val x: Float, val y: Float, val z: Float)
+// Single raw sample: timestamp (ns) + x,y,z
+data class RawSample(
+    val nanoTime: Long,
+    val x: Float,
+    val y: Float,
+    val z: Float
+)
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
 
-    // UI elements
+    // UI
     private lateinit var btnStart: Button
     private lateinit var tvActivated: TextView
     private lateinit var tvStopwatch: TextView
@@ -32,34 +36,37 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var tvProbability: TextView
     private lateinit var tvPredictionsHistory: TextView
 
-    // TFLite helper (initialized in a background thread)
+    // TFLite helper
     private var tflHelper: TFLiteLiteRT? = null
     private var isModelReady = false
 
-    // Capture state
+    // Capture / state
     private var isRunning = false
-    private var startTime: Long = 0L
+    private var startMs = 0L
 
-    // Sliding window for 128 samples
-    private val targetSampleCount = 128
-    private val sampleQueue = mutableListOf<AccelSample>()
+    // We store raw samples up to 128
+    private val sampleQueue = ArrayDeque<RawSample>()  // use ArrayDeque for efficient removal from front
 
-    // Keep last 8 predictions
-    private val predictionHistory = mutableListOf<Pair<String, Float>>()
+    private val uiHandler = Handler(Looper.getMainLooper())
 
-    // For controlling inference frequency: only once per second
-    private var lastInferenceTimeNs: Long = 0
+    // We'll run inference every 1 second while capturing
+    private val inferenceIntervalMs = 1000L
+    private val inferenceRunnable = object : Runnable {
+        override fun run() {
+            if (isRunning) {
+                doInference() // if at least 128 samples are available
+                uiHandler.postDelayed(this, inferenceIntervalMs)
+            }
+        }
+    }
 
-    // Vibration
-    private lateinit var vibrator: Vibrator
-
-    // Stopwatch update runnable
+    // Periodic UI stopwatch update
     private val updateStopwatchRunnable = object : Runnable {
         override fun run() {
             if (isRunning) {
-                val elapsed = System.currentTimeMillis() - startTime
-                tvStopwatch.text = "Stopwatch: ${elapsed} ms"
-                Handler(Looper.getMainLooper()).postDelayed(this, 100)
+                val elapsed = System.currentTimeMillis() - startMs
+                tvStopwatch.text = "Stopwatch: $elapsed ms"
+                uiHandler.postDelayed(this, 100)
             }
         }
     }
@@ -68,7 +75,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Bind UI
+        // UI references
         btnStart = findViewById(R.id.btnStart)
         tvActivated = findViewById(R.id.tvActivated)
         tvStopwatch = findViewById(R.id.tvStopwatch)
@@ -76,105 +83,119 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         tvProbability = findViewById(R.id.tvProbability)
         tvPredictionsHistory = findViewById(R.id.tvPredictionsHistory)
 
+        // Sensors
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-        vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-
-        // Initialize the TFLite helper off the main thread:
+        // Load TFLite model off the main thread
         Thread {
             try {
-                // Make sure "fall_time2vec_transformer.tflite" is in assets/
                 tflHelper = TFLiteLiteRT(this, "fall_time2vec_transformer.tflite")
                 isModelReady = true
-                Log.d("MainActivity", "Model initialized successfully")
+                Log.d("MainActivity", "TFLite model loaded successfully.")
             } catch (e: Exception) {
-                Log.e("MainActivity", "Error initializing model", e)
+                Log.e("MainActivity", "Error initializing TFLite", e)
             }
         }.start()
 
         btnStart.setOnClickListener {
             if (!isRunning) {
-                startSensorCapture()
+                startCapture()
             } else {
-                stopSensorCapture()
+                stopCapture()
             }
         }
 
-        // If you truly do not need external storage access, you can remove this check:
         checkStoragePermissionIfNeeded()
     }
 
-    private fun startSensorCapture() {
+    private fun startCapture() {
         isRunning = true
-        tvActivated.text = "Activated!"
-        startTime = System.currentTimeMillis()
         sampleQueue.clear()
-        predictionHistory.clear()
-        tvPredictionsHistory.text = ""
+
+        tvActivated.text = "Activated!"
+        tvStopwatch.text = "Stopwatch: 0 ms"
         tvPrediction.text = "Waiting..."
         tvProbability.text = "Probability: -"
-        lastInferenceTimeNs = 0
+        tvPredictionsHistory.text = ""
 
-        Handler(Looper.getMainLooper()).post(updateStopwatchRunnable)
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+        startMs = System.currentTimeMillis()
+
+        // ~33 Hz => 30_000 µs
+        accelerometer?.also { sensor ->
+            sensorManager.registerListener(this, sensor, 30_000)
+        }
+
+        // Start UI stopwatch
+        uiHandler.post(updateStopwatchRunnable)
+
+        // Start repeating inference every 1 second
+        uiHandler.postDelayed(inferenceRunnable, inferenceIntervalMs)
     }
 
-    private fun stopSensorCapture() {
+    private fun stopCapture() {
+        if (!isRunning) return
         isRunning = false
-        tvActivated.text = "Not Activated"
+
         sensorManager.unregisterListener(this)
+        tvActivated.text = "Not Activated"
+
+        // Stop UI updates
+        uiHandler.removeCallbacks(updateStopwatchRunnable)
+        uiHandler.removeCallbacks(inferenceRunnable)
+
+        val elapsed = System.currentTimeMillis() - startMs
+        tvStopwatch.text = "Stopwatch: $elapsed ms"
     }
 
-    override fun onSensorChanged(event: SensorEvent?) {
-        if (!isRunning || event == null) return
-        if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
+    /**
+     * doInference():
+     * If we have >= 128 samples, run inference on the latest 128.
+     * Optionally, remove older samples from the front to achieve a stride (overlap or no overlap).
+     */
+    private fun doInference() {
+        if (!isModelReady) return
 
-        // Add new sample
-        val sample = AccelSample(event.timestamp, event.values[0], event.values[1], event.values[2])
-        if (sampleQueue.size >= targetSampleCount) {
-            sampleQueue.removeAt(0)
+        val N = sampleQueue.size
+        if (N < 128) {
+            // Not enough data yet
+            return
         }
-        sampleQueue.add(sample)
 
-        // Only run inference if we have 128 samples and at least 1 second since last inference
-        if (sampleQueue.size == targetSampleCount) {
-            val nowNs = event.timestamp
-            if (lastInferenceTimeNs == 0L || (nowNs - lastInferenceTimeNs) >= 1_000_000_000L) {
-                lastInferenceTimeNs = nowNs
-                runInferenceOnBackgroundThread()
-            }
-        }
-    }
+        // We'll take the last 128
+        // If we want a pure sliding window with stride of 1 sample, we'd remove 1 each time, etc.
+        // For demonstration, we'll do a FULL overlap => always the last 128 samples
+        val finalCount = 128
+        val used = sampleQueue.takeLast(finalCount)
 
-    private fun runInferenceOnBackgroundThread() {
-        // Convert the queue to magnitude
-        val inputData = FloatArray(targetSampleCount)
-        for (i in sampleQueue.indices) {
-            val s = sampleQueue[i]
-            val mag = sqrt(s.x * s.x + s.y * s.y + s.z * s.z)
-            inputData[i] = mag
+        // Convert to arrays: finalTime [128], finalXYZ [128,3], finalMask [128]
+        val finalTime = FloatArray(finalCount)
+        val finalXYZ = Array(finalCount) { FloatArray(3) }
+        val finalMask = FloatArray(finalCount) { 0f }
+
+        // Base time
+        val t0 = used.first().nanoTime.toDouble()
+        for (i in used.indices) {
+            val s = used.elementAt(i)
+            finalTime[i] = ((s.nanoTime - t0) / 1e9).toFloat()
+            finalXYZ[i][0] = s.x
+            finalXYZ[i][1] = s.y
+            finalXYZ[i][2] = s.z
         }
+
+        // (Optionally) remove older samples so the queue doesn't grow infinitely
+        // If we want a full overlap, do not remove any. (We'll keep them for the next inference.)
+        // If we want partial overlap, remove e.g. 33 samples for ~1s stride at ~33Hz sampling:
+        //   for (x in 0 until 33) { sampleQueue.removeFirst() }
+        // For now, let's do full overlap => do not remove.
 
         Thread {
             try {
-                if (!isModelReady) {
-                    // If model not ready, skip
-                    updateUI("Model not ready", -9999f)
-                    return@Thread
-                }
-                val prob = tflHelper?.runInference(inputData) ?: -9999f
-
-                val label = if (prob > 0.5f) "FALL DETECTED" else "No Fall"
-
-                // Vibrate if fall detected
-                if (label == "FALL DETECTED") {
-                    vibrateBriefly()
-                }
-
-                updateUI(label, prob)
+                val pFall = tflHelper?.runInference(finalTime, finalXYZ, finalMask) ?: -9999f
+                val label = if (pFall > 0.5f) "FALL DETECTED" else "No Fall"
+                updateUI(label, pFall)
             } catch (e: Exception) {
-                Log.e("MainActivity", "Inference failed", e)
+                Log.e("MainActivity", "Inference error", e)
                 runOnUiThread {
                     tvPrediction.text = "Inference error: ${e.message}"
                 }
@@ -182,43 +203,51 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }.start()
     }
 
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (!isRunning || event == null) return
+        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+            sampleQueue.addLast(
+                RawSample(
+                    nanoTime = event.timestamp,
+                    x = event.values[0],
+                    y = event.values[1],
+                    z = event.values[2]
+                )
+            )
+            // (Optional) If we want to cap queue size to avoid indefinite memory growth:
+            if (sampleQueue.size > 2000) {
+                // just in case, limit queue
+                repeat(sampleQueue.size - 2000) {
+                    sampleQueue.removeFirst()
+                }
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Not used
+    }
+
     private fun updateUI(label: String, probability: Float) {
         runOnUiThread {
-            // Add to history
-            predictionHistory.add(label to probability)
-            if (predictionHistory.size > 8) {
-                predictionHistory.removeAt(0)
-            }
-            // Display
-            val historyText = predictionHistory.joinToString("\n") {
-                "${it.first} - ${"%.3f".format(it.second)}"
-            }
-            tvPredictionsHistory.text = historyText
-
             tvPrediction.text = label
-            tvProbability.text = "Probability: ${"%.3f".format(probability)}"
+            tvProbability.text = "Probability: %.3f".format(probability)
+            val historyLine = "$label - %.3f".format(probability)
+            tvPredictionsHistory.append("\n$historyLine")
         }
     }
 
-    private fun vibrateBriefly() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            vibrator.vibrate(300)
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-
-    // If you do not need external storage at all, you can remove this method entirely.
+    /**
+     * Check or request external storage permission on older devices (below API 29),
+     * if you actually need read/write. You can remove if not needed.
+     */
     private fun checkStoragePermissionIfNeeded() {
-        // For Android 13+ there's a different approach, but if you truly do not need it, remove.
-        val neededPermission = Manifest.permission.WRITE_EXTERNAL_STORAGE
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            if (ContextCompat.checkSelfPermission(this, neededPermission)
+            val perm = Manifest.permission.WRITE_EXTERNAL_STORAGE
+            if (ContextCompat.checkSelfPermission(this, perm)
                 != PackageManager.PERMISSION_GRANTED
             ) {
-                ActivityCompat.requestPermissions(this, arrayOf(neededPermission), 123)
+                ActivityCompat.requestPermissions(this, arrayOf(perm), 123)
             }
         }
     }
