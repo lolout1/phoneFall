@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Not Activated"
-        android:textSize="18sp"
+        android:textSize="20sp"
         android:padding="4dp" />
 
     <!-- Stopwatch display -->
@@ -22,16 +22,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Stopwatch: 0 ms"
-        android:textSize="16sp"
+        android:textSize="20sp"
         android:padding="4dp" />
 
-    <!-- Current prediction label (e.g., "FALL DETECTED" or "No Fall") -->
+    <!-- Current prediction label -->
     <TextView
         android:id="@+id/tvPrediction"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Waiting..."
-        android:textSize="16sp"
+        android:textSize="20sp"
         android:padding="4dp" />
 
     <!-- Probability display -->
@@ -40,7 +40,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Probability: -"
-        android:textSize="16sp"
+        android:textSize="20sp"
         android:padding="4dp" />
 
     <!-- Button to start/stop sensor capture -->
@@ -52,16 +52,21 @@
         android:padding="8dp"
         android:layout_marginTop="8dp" />
 
-    <!-- Multiline history of predictions (last 8) -->
-    <TextView
-        android:id="@+id/tvPredictionsHistory"
+    <!-- Scrollable prediction history -->
+    <ScrollView
+        android:id="@+id/scrollViewPredictions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:lines="8"
-        android:scrollbars="vertical"
-        android:inputType="textMultiLine"
-        android:textSize="14sp"
-        android:layout_marginTop="12dp"
-        android:padding="4dp" />
+        android:layout_marginTop="12dp">
+
+        <!-- Multiline history of predictions (last 8) -->
+        <TextView
+            android:id="@+id/tvPredictionsHistory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="20sp"
+            android:padding="4dp" />
+    </ScrollView>
 
 </LinearLayout>
