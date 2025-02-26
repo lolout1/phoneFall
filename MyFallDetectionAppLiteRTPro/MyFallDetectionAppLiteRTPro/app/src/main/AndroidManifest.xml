@@ -1,35 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Require accelerometer hardware -->
+    <!-- Accelerometer feature is required -->
     <uses-feature
         android:name="android.hardware.sensor.accelerometer"
         android:required="true" />
 
-    <!-- Permissions for devices below API 29 -->
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="34" />
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="34" />
+    <!-- Basic permissions -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Storage permissions are no longer needed for app‑specific files -->
+    <!-- Notification permission for Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Foreground service permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH"/>
+    <!-- Sensor permission (required for health-type services) -->
+    <uses-permission android:name="android.permission.BODY_SENSORS"/>
 
     <application
         android:allowBackup="true"
-        android:label="MyFallDetectionAppLiteRTPro"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <!-- Uncomment and set launcher icons if available:
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round" -->
+
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".HomeActivity"
+            android:exported="true"
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".LoggingActivity"
+            android:exported="true"
+            android:label="@string/logs_title" />
+
+        <service
+            android:name=".BackgroundFallService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
     </application>
 </manifest>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">MyFallDetectionAppLiteRTPro</string>
+
+    <!-- Home Screen Strings -->
+    <string name="select_tflite">Select TFLite Model:</string>
+    <string name="tflite_option_1">fall_time2vec_transformer.tflite</string>
+    <string name="tflite_option_2">alternative_model.tflite</string>
+
+    <string name="select_device_mode">Select Device Mode:</string>
+    <string name="device_mode_watch_phone">Watch + Phone</string>
+    <string name="device_mode_phone">Just Phone</string>
+    <string name="device_mode_watch">Just Watch</string>
+
+    <string name="select_sensor_type">Select Sensor Type:</string>
+    <string name="sensor_accelerometer">Accelerometer</string>
+    <string name="sensor_gyroscope">Gyroscope</string>
+    <string name="sensor_both">Both</string>
+
+    <string name="time_embedding">Time Embedding Enabled</string>
+
+    <string name="btn_start">Start Detection</string>
+    <string name="btn_stop">Stop Detection</string>
+    <string name="btn_view_logs">View Logs</string>
+    <string name="model_file_label">Select Model File</string>
+    <string name="device_type_label">Select Device Type</string>
+    <string name="sensor_type_label">Select Sensor Type</string>
+    <string name="activated_status_not">Not Activated</string>
+    <string name="stopwatch_initial">Stopwatch: 0 ms</string>
+    <string name="prediction_waiting">Waiting...</string>
+    <string name="probability_initial">Probability: -</string>
+    <string name="time_embedding_label">Time Embedding Enabled</string>
+
+    <!-- Logging Screen Strings -->
+    <string name="logs_title">Model Input Logs</string>
+    <string name="tv_logs_desc">Displays logs of sensor runs</string>
+    <string name="btn_compute_stats">Compute SMV Stats (Fall vs No Fall)</string>
+    <string name="btn_compute_stats_desc">Tap to compute sensor data statistics</string>
+    <string name="btn_delete_logs">Delete Log Files</string>
+    <string name="btn_delete_logs_desc">Tap to delete log files</string>
+    <string name="tv_stats_label">Stats:</string>
+    <string name="tv_stats_desc">Displays computed statistics for sensor runs</string>
+</resources>

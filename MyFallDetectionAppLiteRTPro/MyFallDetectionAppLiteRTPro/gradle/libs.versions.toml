@@ -6,9 +6,14 @@ androidx-core = "1.12.0"
 appcompat = "1.6.1"
 constraintlayout = "2.1.4"
 lifecycle-runtime = "2.7.0"
-
 material = "1.12.0"
 litertSupportApi = "1.1.2"
+databindingCommon = "8.8.1"
+library = "8.8.1"
+databindingCompiler = "8.8.1"
+databindingRuntime = "8.8.1"
+baselibrary = "8.8.1"
+databindingAdapters = "8.8.1"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "android-gradlePlugin" }
@@ -21,3 +26,9 @@ constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayo
 lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle-runtime" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
 litert-support-api = { group = "com.google.ai.edge.litert", name = "litert-support-api", version.ref = "litertSupportApi" }
+databinding-common = { group = "androidx.databinding", name = "databinding-common", version.ref = "databindingCommon" }
+library = { group = "com.android.databinding", name = "library", version.ref = "library" }
+databinding-compiler = { group = "androidx.databinding", name = "databinding-compiler", version.ref = "databindingCompiler" }
+databinding-runtime = { group = "androidx.databinding", name = "databinding-runtime", version.ref = "databindingRuntime" }
+baselibrary = { group = "com.android.databinding", name = "baseLibrary", version.ref = "baselibrary" }
+databinding-adapters = { group = "androidx.databinding", name = "databinding-adapters", version.ref = "databindingAdapters" }

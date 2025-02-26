@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scrollViewConfig"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- TFLite model file selection -->
+        <TextView
+            android:id="@+id/tvModelFileLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/model_file_label"
+            android:textSize="18sp" />
+        <Spinner
+            android:id="@+id/spinnerModelFile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <!-- Device type selection -->
+        <TextView
+            android:id="@+id/tvDeviceTypeLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/device_type_label"
+            android:textSize="18sp"
+            android:layout_marginTop="16dp" />
+        <Spinner
+            android:id="@+id/spinnerDeviceType"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <!-- Sensor type selection -->
+        <TextView
+            android:id="@+id/tvSensorTypeLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/sensor_type_label"
+            android:textSize="18sp"
+            android:layout_marginTop="16dp" />
+        <Spinner
+            android:id="@+id/spinnerSensorType"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <!-- Time Embedding toggle -->
+        <TextView
+            android:id="@+id/tvTimeEmbeddingLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/time_embedding_label"
+            android:textSize="18sp"
+            android:layout_marginTop="16dp" />
+        <Switch
+            android:id="@+id/switchTimeEmbedding"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+</ScrollView>

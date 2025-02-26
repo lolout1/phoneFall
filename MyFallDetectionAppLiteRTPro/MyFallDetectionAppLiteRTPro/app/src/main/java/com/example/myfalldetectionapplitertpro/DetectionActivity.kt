@@ -13,9 +13,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
-class MainActivity : AppCompatActivity() {
+class DetectionActivity : AppCompatActivity() {
 
-    private val TAG = "MainActivity"
+    private val TAG = "DetectionActivity"
 
     // UI
     private lateinit var btnStart: Button
@@ -24,13 +24,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvPrediction: TextView
     private lateinit var tvProbability: TextView
     private lateinit var tvHistory: TextView
-    private lateinit var scrollViewPredictions: ScrollView
+    private lateinit var scrollView: ScrollView
 
-    // State for the stopwatch
+    // State for stopwatch
     private var isRunning = false
     private var startMs: Long = 0L
 
-    // Handler to update stopwatch every 100 ms
+    // Keep a small list of recent predictions
+    private val predictionsHistory = mutableListOf<String>()
+
     private val uiHandler = Handler(Looper.getMainLooper())
     private val updateStopwatchRunnable = object : Runnable {
         override fun run() {
@@ -42,21 +44,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Keep a small list of predictions
-    private val predictionsHistory = mutableListOf<String>()
-
-    // Listen for broadcasts from the service
+    // BroadcastReceiver to handle inference results from service
     private val inferenceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 BackgroundFallService.ACTION_INFERENCE_RESULT -> {
                     val label = intent.getStringExtra(BackgroundFallService.EXTRA_LABEL) ?: "N/A"
                     val probability = intent.getFloatExtra(BackgroundFallService.EXTRA_PROBABILITY, -9999f)
-                    Log.d(TAG, "Inference: $label ($probability)")
+                    Log.d(TAG, "Received inference: $label (prob=$probability)")
                     updateInferenceUI(label, probability)
                 }
                 BackgroundFallService.ACTION_FALL_DETECTED -> {
-                    Log.d(TAG, "Fall Detected broadcast!")
+                    Log.d(TAG, "Fall detected broadcast")
                     showFallDetectedDialog()
                 }
             }
@@ -67,21 +66,21 @@ class MainActivity : AppCompatActivity() {
         tvPrediction.text = label
         tvProbability.text = "Probability: %.3f".format(probability)
 
-        // Keep last 8
+        // Keep last 8 predictions in history
         predictionsHistory.add("$label (%.3f)".format(probability))
         if (predictionsHistory.size > 8) {
             predictionsHistory.removeAt(0)
         }
         tvHistory.text = predictionsHistory.joinToString("\n")
 
-        scrollViewPredictions.post {
-            scrollViewPredictions.fullScroll(ScrollView.FOCUS_DOWN)
-        }
+        // Auto scroll
+        scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_main)  // Reuse your activity_main.xml
+        Log.d(TAG, "onCreate")
 
         // Bind UI
         btnStart = findViewById(R.id.btnStart)
@@ -90,8 +89,9 @@ class MainActivity : AppCompatActivity() {
         tvPrediction = findViewById(R.id.tvPrediction)
         tvProbability = findViewById(R.id.tvProbability)
         tvHistory = findViewById(R.id.tvPredictionsHistory)
-        scrollViewPredictions = findViewById(R.id.scrollViewPredictions)
+        scrollView = findViewById(R.id.scrollViewPredictions)
 
+        // Button toggles start/stop
         btnStart.setOnClickListener {
             if (!isRunning) {
                 startCapture()
@@ -100,11 +100,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Check storage permission on older devices
         checkStoragePermissionIfNeeded()
     }
 
     override fun onResume() {
         super.onResume()
+        // Register broadcast receiver
         val filter = IntentFilter().apply {
             addAction(BackgroundFallService.ACTION_INFERENCE_RESULT)
             addAction(BackgroundFallService.ACTION_FALL_DETECTED)
@@ -114,13 +116,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        // Unregister
         unregisterReceiver(inferenceReceiver)
     }
 
     private fun startCapture() {
         isRunning = true
         startMs = System.currentTimeMillis()
-
         tvActivated.text = "Activated!"
         tvStopwatch.text = "Stopwatch: 0 ms"
         tvPrediction.text = "Waiting..."
@@ -128,13 +130,14 @@ class MainActivity : AppCompatActivity() {
         tvHistory.text = ""
         predictionsHistory.clear()
 
-        // Start the service with action = "START_CAPTURE"
+        // Start service with action START_CAPTURE
         val intent = Intent(this, BackgroundFallService::class.java).apply {
             action = "START_CAPTURE"
         }
         // For Android 8.0+ you must use startForegroundService
         ContextCompat.startForegroundService(this, intent)
 
+        // Start stopwatch
         uiHandler.post(updateStopwatchRunnable)
     }
 
@@ -145,15 +148,24 @@ class MainActivity : AppCompatActivity() {
         val elapsed = System.currentTimeMillis() - startMs
         tvStopwatch.text = "Stopwatch: $elapsed ms"
 
-        // Tell the service to stop capturing
+        // Send STOP_CAPTURE to service
         val intent = Intent(this, BackgroundFallService::class.java).apply {
             action = "STOP_CAPTURE"
         }
         startService(intent)
     }
 
+    private fun checkStoragePermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val perm = Manifest.permission.WRITE_EXTERNAL_STORAGE
+            if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(perm), 123)
+            }
+        }
+    }
+
     /**
-     * Called if service broadcasts ACTION_FALL_DETECTED
+     * Called when the service broadcasts ACTION_FALL_DETECTED
      */
     private fun showFallDetectedDialog() {
         if (!isFinishing) {
@@ -163,22 +175,10 @@ class MainActivity : AppCompatActivity() {
                 .setCancelable(false)
                 .setPositiveButton("OK") { dialog, _ ->
                     dialog.dismiss()
-                    // Optionally re-start capture
+                    // Optionally restart capturing
                     startCapture()
                 }
                 .show()
-        }
-    }
-
-    /**
-     * For API < 29, request WRITE_EXTERNAL_STORAGE if needed.
-     */
-    private fun checkStoragePermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            val perm = Manifest.permission.WRITE_EXTERNAL_STORAGE
-            if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(perm), 123)
-            }
         }
     }
 }

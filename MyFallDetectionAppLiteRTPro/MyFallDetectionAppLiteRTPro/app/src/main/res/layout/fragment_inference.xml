@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/scrollViewInference"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Status display -->
+        <TextView
+            android:id="@+id/tvActivated"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/activated_status_not"
+            android:textSize="18sp" />
+
+        <!-- Stopwatch display -->
+        <TextView
+            android:id="@+id/tvStopwatch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/stopwatch_initial"
+            android:textSize="18sp" />
+
+        <!-- Prediction label -->
+        <TextView
+            android:id="@+id/tvPrediction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/prediction_waiting"
+            android:textSize="18sp" />
+
+        <!-- Probability display -->
+        <TextView
+            android:id="@+id/tvProbability"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/probability_initial"
+            android:textSize="18sp" />
+
+        <!-- Start/Stop inference button -->
+        <Button
+            android:id="@+id/btnStart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_start"
+            android:layout_marginTop="16dp" />
+    </LinearLayout>
+</ScrollView>
