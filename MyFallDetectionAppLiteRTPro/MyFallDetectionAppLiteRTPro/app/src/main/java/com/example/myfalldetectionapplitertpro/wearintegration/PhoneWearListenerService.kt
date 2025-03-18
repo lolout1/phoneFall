@@ -1,15 +1,13 @@
 package com.example.myfalldetectionapplitertpro.wearintegration
 
+import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.myfalldetectionapplitertpro.BackgroundFallService
 import com.google.android.gms.tasks.Tasks
-import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
-import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import java.nio.ByteBuffer
@@ -17,13 +15,8 @@ import java.nio.ByteOrder
 import java.util.concurrent.TimeUnit
 
 /**
- * Service that manages bidirectional communication with the watch.
- *
- * Responsibilities:
- * 1. Receive sensor data from watch and forward to BackgroundFallService
- * 2. Send commands (start/stop/config) to watch
- * 3. Send prediction results back to watch
- * 4. Monitor watch connection status
+ * Service that listens for messages from the watch, processes them, and forwards
+ * the data to the BackgroundFallService for fall detection processing.
  */
 class PhoneWearListenerService : WearableListenerService() {
 
@@ -38,206 +31,24 @@ class PhoneWearListenerService : WearableListenerService() {
         private const val PATH_ACCEL_DATA = "/watch_accel_data"
         private const val PATH_WATCH_STATUS = "/watch_status"
         private const val PATH_HEARTBEAT = "/watch_heartbeat"
-
-        // Message paths for sending to watch
         private const val PATH_START_ON_WATCH = "/start_on_watch"
         private const val PATH_STOP_ON_WATCH = "/stop_on_watch"
         private const val PATH_CONFIG_UPDATE = "/config_update"
         private const val PATH_PREDICT_UPDATE = "/predict_update"
 
-        // Connection management
+        // Track connected watch node
         private var watchNodeId: String? = null
         private var lastDataReceived = 0L
-        private var connectionCheckScheduled = false
-        private val handler = Handler(Looper.getMainLooper())
-        private const val CONNECTION_CHECK_INTERVAL = 10000L // 10 seconds
-
-        // Connection status checker
-        private val connectionChecker = object : Runnable {
-            override fun run() {
-                val now = System.currentTimeMillis()
-                if (watchNodeId != null && now - lastDataReceived > 5000) {
-                    Log.w(TAG, "No data received from watch in ${now - lastDataReceived}ms")
-
-                    // If we haven't received data for too long, broadcast a warning
-                    if (now - lastDataReceived > 15000) {
-                        Log.e(TAG, "Watch connection may be lost - no data for ${now - lastDataReceived}ms")
-                        // Clear the node ID - we'll need to rediscover it
-                        watchNodeId = null
-                        // Let the UI know
-                        broadcastWatchStatus("WATCH_CONNECTION_LOST")
-                    }
-                }
-
-                // Schedule next check
-                handler.postDelayed(this, CONNECTION_CHECK_INTERVAL)
-            }
-        }
 
         /**
          * Gets the currently connected watch node ID
          */
         fun getWatchNodeId(): String? = watchNodeId
-
-        /**
-         * Checks if we've received data from the watch recently
-         * @return true if the watch is actively sending data
-         */
-        fun hasRecentData(): Boolean {
-            return watchNodeId != null &&
-                    System.currentTimeMillis() - lastDataReceived < 5000
-        }
-
-        /**
-         * Finds available watch nodes
-         * @return List of watch nodes
-         */
-        suspend fun findWatchNodes(context: Context): List<Node> {
-            try {
-                return Tasks.await(
-                    Wearable.getNodeClient(context).connectedNodes,
-                    5, TimeUnit.SECONDS
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Error finding watch nodes: ${e.message}")
-                return emptyList()
-            }
-        }
-
-        /**
-         * Sends a message to the watch using the stored node ID
-         * @return true if message was sent successfully
-         */
-        fun sendMessageToWatch(context: Context, path: String, data: ByteArray = ByteArray(0)): Boolean {
-            if (watchNodeId == null) {
-                Log.e(TAG, "Cannot send message to watch: No watch node ID")
-
-                // Try to find watch nodes
-                Thread {
-                    try {
-                        val nodes = Tasks.await(
-                            Wearable.getNodeClient(context).connectedNodes,
-                            2, TimeUnit.SECONDS
-                        )
-
-                        if (nodes.isNotEmpty()) {
-                            watchNodeId = nodes.first().id
-                            Log.d(TAG, "Discovered watch node: $watchNodeId")
-                            // Try sending again with the new node ID
-                            sendMessageToWatch(context, path, data)
-                        } else {
-                            Log.e(TAG, "No connected watch nodes found")
-                            broadcastWatchStatus(context, "WATCH_NOT_CONNECTED")
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error finding watch nodes: ${e.message}")
-                    }
-                }.start()
-
-                return false
-            }
-
-            try {
-                Log.d(TAG, "Sending message to watch: $path")
-
-                Wearable.getMessageClient(context)
-                    .sendMessage(watchNodeId!!, path, data)
-                    .addOnSuccessListener {
-                        Log.d(TAG, "Successfully sent message to watch: $path")
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e(TAG, "Failed to send message to watch: ${e.message}")
-                        // Clear node ID if communication failed
-                        if (e.message?.contains("Status{statusCode=NETWORK_ERROR") == true) {
-                            watchNodeId = null
-                            broadcastWatchStatus(context, "WATCH_CONNECTION_ERROR")
-                        }
-                    }
-                return true
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending message to watch: ${e.message}")
-                return false
-            }
-        }
-
-        /**
-         * Broadcasts a watch status update from any context
-         */
-        fun broadcastWatchStatus(context: Context, status: String) {
-            val intent = Intent(ACTION_WATCH_STATUS_UPDATE).apply {
-                putExtra(EXTRA_WATCH_STATUS, status)
-            }
-            LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
-            context.sendBroadcast(intent)
-        }
-
-        /**
-         * Starts the connection checker if not already running
-         */
-        fun startConnectionChecker() {
-            if (!connectionCheckScheduled) {
-                handler.post(connectionChecker)
-                connectionCheckScheduled = true
-                Log.d(TAG, "Watch connection checker started")
-            }
-        }
-
-        /**
-         * Stops the connection checker
-         */
-        fun stopConnectionChecker() {
-            handler.removeCallbacks(connectionChecker)
-            connectionCheckScheduled = false
-            Log.d(TAG, "Watch connection checker stopped")
-        }
-
-        /**
-         * Sends a start command to the watch
-         */
-        fun startWatchSensors(context: Context, useLinear: Boolean = false) {
-            val configStr = "CONFIG:Watch:${if (useLinear) "Linear" else "Raw"}:false"
-            sendMessageToWatch(context, PATH_START_ON_WATCH, configStr.toByteArray())
-        }
-
-        /**
-         * Sends a stop command to the watch
-         */
-        fun stopWatchSensors(context: Context) {
-            sendMessageToWatch(context, PATH_STOP_ON_WATCH)
-        }
-
-        /**
-         * Sends configuration update to the watch
-         */
-        fun updateWatchConfig(context: Context, deviceMode: String, dataType: String, timeEmbed: Boolean) {
-            val configStr = "CONFIG:$deviceMode:$dataType:$timeEmbed"
-            sendMessageToWatch(context, PATH_CONFIG_UPDATE, configStr.toByteArray())
-        }
-
-        /**
-         * Sends prediction results to the watch
-         */
-        fun sendPredictionToWatch(context: Context, label: String, probability: Float) {
-            val prediction = "$label (${String.format("%.2f", probability)})"
-            sendMessageToWatch(context, PATH_PREDICT_UPDATE, prediction.toByteArray())
-        }
-    }
-
-    private val messageClient: MessageClient by lazy {
-        Wearable.getMessageClient(this)
     }
 
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "PhoneWearListenerService created and ready")
-
-        // Start connection checker
-        startConnectionChecker()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        stopConnectionChecker()
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -337,8 +148,56 @@ class PhoneWearListenerService : WearableListenerService() {
         val intent = Intent(ACTION_WATCH_STATUS_UPDATE).apply {
             putExtra(EXTRA_WATCH_STATUS, status)
         }
-        // Use both LocalBroadcastManager and regular broadcast
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
         sendBroadcast(intent)
+    }
+
+    /**
+     * Sends a message to the watch
+     */
+    fun sendMessageToWatch(path: String, data: ByteArray = ByteArray(0)) {
+        if (watchNodeId == null) {
+            Log.e(TAG, "Cannot send message to watch: No watch node ID")
+            return
+        }
+
+        Wearable.getMessageClient(this)
+            .sendMessage(watchNodeId!!, path, data)
+            .addOnSuccessListener {
+                Log.d(TAG, "Successfully sent message to watch: $path")
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Failed to send message to watch: ${e.message}")
+            }
+    }
+
+    /**
+     * Helper method to start watch sensors
+     */
+    fun startWatch(useLinear: Boolean = false) {
+        val configStr = "CONFIG:Watch:${if (useLinear) "Linear" else "Raw"}:false"
+        sendMessageToWatch(PATH_START_ON_WATCH, configStr.toByteArray())
+    }
+
+    /**
+     * Helper method to stop watch sensors
+     */
+    fun stopWatch() {
+        sendMessageToWatch(PATH_STOP_ON_WATCH)
+    }
+
+    /**
+     * Helper method to update watch configuration
+     */
+    fun updateConfig(deviceMode: String, dataType: String, timeEmbed: Boolean) {
+        val configStr = "CONFIG:$deviceMode:$dataType:$timeEmbed"
+        sendMessageToWatch(PATH_CONFIG_UPDATE, configStr.toByteArray())
+    }
+
+    /**
+     * Helper method to send predictions to watch
+     */
+    fun sendPrediction(label: String, probability: Float) {
+        val prediction = "$label (${String.format("%.2f", probability)})"
+        sendMessageToWatch(PATH_PREDICT_UPDATE, prediction.toByteArray())
     }
 }

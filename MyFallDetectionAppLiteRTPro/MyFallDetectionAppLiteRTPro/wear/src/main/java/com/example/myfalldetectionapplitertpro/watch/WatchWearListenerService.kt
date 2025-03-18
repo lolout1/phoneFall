@@ -21,6 +21,7 @@ class WatchWearListenerService : WearableListenerService() {
         private const val PATH_CONFIG_UPDATE = "/config_update"
         private const val PATH_STATUS_REQUEST = "/status_request"
         private const val PATH_PREDICT_UPDATE = "/predict_update"
+        private const val PATH_PHONE_COMMAND = "/phone_command"
     }
 
     override fun onCreate() {
@@ -61,6 +62,9 @@ class WatchWearListenerService : WearableListenerService() {
                     putExtra("PHONE_NODE_ID", phoneNodeId)
                 }
                 startService(serviceIntent)
+
+                // Also broadcast to UI
+                sendBroadcast(Intent(WatchMainActivity.ACTION_START_ON_WATCH))
             }
 
             PATH_STOP_ON_WATCH -> {
@@ -71,6 +75,9 @@ class WatchWearListenerService : WearableListenerService() {
                     action = "STOP_SERVICE"
                 }
                 startService(serviceIntent)
+
+                // Also broadcast to UI
+                sendBroadcast(Intent(WatchMainActivity.ACTION_STOP_ON_WATCH))
             }
 
             PATH_CONFIG_UPDATE -> {
@@ -123,6 +130,21 @@ class WatchWearListenerService : WearableListenerService() {
                     putExtra("prediction", prediction)
                 }
                 sendBroadcast(intent)
+            }
+
+            PATH_PHONE_COMMAND -> {
+                Log.d(TAG, "Received PHONE_COMMAND: ${String(data)}")
+                // Handle any special commands from phone
+                when (String(data)) {
+                    "PING" -> {
+                        // Send immediate heartbeat response
+                        sendStatusToPhone(phoneNodeId, "WATCH_PING_RESPONSE")
+                    }
+                    "CONNECT" -> {
+                        // Send connection confirmation
+                        sendStatusToPhone(phoneNodeId, "WATCH_CONNECTED")
+                    }
+                }
             }
         }
     }

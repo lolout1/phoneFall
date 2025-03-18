@@ -1,6 +1,7 @@
+// Replace WatchMainActivity.kt with this version
 package com.example.myfalldetectionapplitertpro.watch
 
-import android.app.Activity  // Changed from androidx.appcompat.app.AppCompatActivity
+import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -9,7 +10,6 @@ import android.graphics.Color
 import android.os.*
 import android.util.Log
 import android.widget.TextView
-import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -17,7 +17,7 @@ import java.util.*
  * Main activity for the watch app.
  * This displays status information and connection state.
  */
-class WatchMainActivity : Activity() {  // Changed from AppCompatActivity to Activity
+class WatchMainActivity : Activity() {  // CRITICAL: Must be Activity, not AppCompatActivity
 
     companion object {
         private const val TAG = "WatchMainActivity"
@@ -144,7 +144,9 @@ class WatchMainActivity : Activity() {  // Changed from AppCompatActivity to Act
             addAction(ACTION_STOP_ON_WATCH)
             addAction(ACTION_PREDICT_UPDATE)
         }
-        registerReceiver(statusReceiver, filter, Context.RECEIVER_EXPORTED)
+
+        // IMPORTANT: For API 30 (Android 11), don't use RECEIVER_NOT_EXPORTED flag
+        registerReceiver(statusReceiver, filter)
 
         // Check service status and update UI
         checkServiceStatus()
@@ -152,7 +154,11 @@ class WatchMainActivity : Activity() {  // Changed from AppCompatActivity to Act
 
     override fun onPause() {
         super.onPause()
-        unregisterReceiver(statusReceiver)
+        try {
+            unregisterReceiver(statusReceiver)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering receiver: ${e.message}")
+        }
     }
 
     override fun onDestroy() {
@@ -211,7 +217,7 @@ class WatchMainActivity : Activity() {  // Changed from AppCompatActivity to Act
      */
     private fun vibrateDevice() {
         try {
-            val vibrator = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
                 vibratorManager.defaultVibrator
             } else {
@@ -220,7 +226,7 @@ class WatchMainActivity : Activity() {  // Changed from AppCompatActivity to Act
             }
 
             if (vibrator.hasVibrator()) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     vibrator.vibrate(VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE))
                 } else {
                     @Suppress("DEPRECATION")

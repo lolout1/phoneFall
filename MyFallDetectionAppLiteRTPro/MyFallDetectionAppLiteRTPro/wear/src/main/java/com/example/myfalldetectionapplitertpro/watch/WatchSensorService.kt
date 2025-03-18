@@ -1,14 +1,15 @@
 package com.example.myfalldetectionapplitertpro.watch
 
-import android.app.Service
+import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.IBinder
+import android.os.*
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.google.android.gms.wearable.Wearable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -24,6 +25,8 @@ class WatchSensorService : Service(), SensorEventListener {
 
     companion object {
         private const val TAG = "WatchSensorService"
+        private const val NOTIFICATION_ID = 12345
+        private const val CHANNEL_ID = "fall_detection_channel"
 
         // Message paths for communicating with phone
         private const val PATH_ACCEL_DATA = "/watch_accel_data"
@@ -36,7 +39,7 @@ class WatchSensorService : Service(), SensorEventListener {
         private const val HEARTBEAT_INTERVAL_MS = 2000L  // Send heartbeat every 2 seconds
 
         // Static service status tracking
-        private var running = false
+        @Volatile private var running = false
 
         /**
          * Checks if the service is currently running
@@ -46,6 +49,7 @@ class WatchSensorService : Service(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private lateinit var scheduler: ScheduledExecutorService
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private var accelerometer: Sensor? = null
     private var useLinearAcceleration: Boolean = false
@@ -68,8 +72,72 @@ class WatchSensorService : Service(), SensorEventListener {
         super.onCreate()
         Log.d(TAG, "WatchSensorService onCreate")
 
+        // Create notification channel
+        createNotificationChannel()
+
         // Initialize sensor manager
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+
+        // Acquire wake lock to prevent the device from sleeping while collecting sensor data
+        acquireWakeLock()
+    }
+
+    /**
+     * Creates notification channel for foreground service
+     */
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Fall Detection Service",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Collects sensor data for fall detection"
+            }
+
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    /**
+     * Creates a notification for the foreground service
+     */
+    private fun createNotification(contentText: String): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Fall Detection Active")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    /**
+     * Acquires a wake lock to prevent the device from sleeping while collecting sensor data
+     */
+    private fun acquireWakeLock() {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "WatchSensorService::SensorWakeLock"
+        ).apply {
+            acquire(10*60*1000L) // 10 minutes timeout
+        }
+
+        Log.d(TAG, "Wake lock acquired: ${wakeLock?.isHeld}")
+    }
+
+    /**
+     * Release wake lock if it's held
+     */
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.d(TAG, "Wake lock released")
+            }
+        }
+        wakeLock = null
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -103,6 +171,7 @@ class WatchSensorService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         stopSensorCollection()
+        releaseWakeLock()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -120,6 +189,9 @@ class WatchSensorService : Service(), SensorEventListener {
         this.phoneNodeId = phoneNode
 
         Log.d(TAG, "Starting sensor collection with useLinear=$useLinear, phoneNode=$phoneNode")
+
+        // Start as a foreground service to increase priority
+        startForeground(NOTIFICATION_ID, createNotification("Collecting accelerometer data"))
 
         // Use linear acceleration or raw accelerometer based on config
         accelerometer = if (useLinearAcceleration) {
@@ -178,12 +250,23 @@ class WatchSensorService : Service(), SensorEventListener {
         Log.d(TAG, "Stopping watch sensor service")
         running = false
 
+        // Remove foreground status
+        stopForeground(true)
+
         // Unregister sensor listener
         sensorManager.unregisterListener(this)
 
         // Shutdown scheduler
         if (::scheduler.isInitialized) {
-            scheduler.shutdown()
+            try {
+                scheduler.shutdown()
+                if (!scheduler.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    scheduler.shutdownNow()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error shutting down scheduler: ${e.message}")
+                scheduler.shutdownNow()
+            }
         }
 
         // Send any remaining samples
@@ -210,6 +293,11 @@ class WatchSensorService : Service(), SensorEventListener {
                     z = event.values[2]
                 ))
 
+                // Log the first few samples to verify values
+                if (sampleBuffer.size <= 5) {
+                    Log.d(TAG, "Sample: t=${event.timestamp}, x=${event.values[0]}, y=${event.values[1]}, z=${event.values[2]}")
+                }
+
                 // If buffer gets too large, send immediately
                 if (sampleBuffer.size >= MAX_BUFFER_SIZE) {
                     sendBufferedSamples()
@@ -229,13 +317,17 @@ class WatchSensorService : Service(), SensorEventListener {
         synchronized(sampleBuffer) {
             if (sampleBuffer.isEmpty() || phoneNodeId == null) return
 
+            // CRITICAL: Sort samples by timestamp to ensure chronological order
+            // This is essential for the time series transformer model
+            val sortedSamples = sampleBuffer.sortedBy { it.timestamp }
+
             // Create byte buffer to hold the data
             // Each sample is timestamp (long = 8 bytes) + x,y,z (float = 4 bytes each) = 20 bytes
-            val bufferSize = sampleBuffer.size * 16 // 16 bytes per sample
+            val bufferSize = sortedSamples.size * 16 // 16 bytes per sample
             val buffer = ByteBuffer.allocate(bufferSize).order(ByteOrder.LITTLE_ENDIAN)
 
             // Pack all samples into the buffer
-            sampleBuffer.forEach { sample ->
+            for (sample in sortedSamples) {
                 buffer.putLong(sample.timestamp)
                 buffer.putFloat(sample.x)
                 buffer.putFloat(sample.y)
@@ -243,7 +335,8 @@ class WatchSensorService : Service(), SensorEventListener {
             }
 
             // Log data being sent
-            Log.d(TAG, "Sending sensor batch to phone: ${sampleBuffer.size} samples")
+            Log.d(TAG, "Sending sensor batch to phone: ${sortedSamples.size} samples, " +
+                    "time range: ${sortedSamples.first().timestamp}-${sortedSamples.last().timestamp}")
 
             // Send to phone
             Wearable.getMessageClient(this).sendMessage(
@@ -252,7 +345,7 @@ class WatchSensorService : Service(), SensorEventListener {
                 buffer.array()
             )
                 .addOnSuccessListener {
-                    Log.d(TAG, "Successfully sent ${sampleBuffer.size} samples to phone")
+                    Log.d(TAG, "Successfully sent ${sortedSamples.size} samples to phone")
                 }
                 .addOnFailureListener { e ->
                     Log.e(TAG, "Failed to send samples to phone: ${e.message}")

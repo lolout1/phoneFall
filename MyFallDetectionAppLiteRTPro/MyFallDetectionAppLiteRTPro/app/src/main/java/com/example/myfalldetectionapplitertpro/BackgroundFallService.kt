@@ -25,6 +25,7 @@ import org.tensorflow.lite.InterpreterApi
 import org.tensorflow.lite.InterpreterApi.Options
 import org.tensorflow.lite.InterpreterApi.Options.TfLiteRuntime
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.sqrt
 
 /**
@@ -181,6 +182,49 @@ class BackgroundFallService : Service(), SensorEventListener {
     /**
      * Loads the TensorFlow Lite model for inference
      */
+    /**
+     * Parses raw accelerometer data bytes into a list of RawSample objects
+     */
+    private fun parseAccelerometerData(data: ByteArray): List<RawSample> {
+        val samples = mutableListOf<RawSample>()
+        val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+
+        // Each sample has 16 bytes: timestamp (long) + x,y,z (float each)
+        val sampleCount = data.size / 16
+        Log.d(TAG, "Parsing $sampleCount samples from ${data.size} bytes")
+
+        try {
+            for (i in 0 until sampleCount) {
+                val timestamp = buffer.getLong()
+                val x = buffer.getFloat()
+                val y = buffer.getFloat()
+                val z = buffer.getFloat()
+
+                samples.add(RawSample(
+                    nanoTime = timestamp,
+                    x = x,
+                    y = y,
+                    z = z,
+                    isWatch = true
+                ))
+            }
+
+            // Critical: Sort samples by timestamp to ensure chronological order
+            val sortedSamples = samples.sortedBy { it.nanoTime }
+
+            Log.d(TAG, "Successfully parsed ${sortedSamples.size} watch samples, time range: ${
+                if (sortedSamples.isNotEmpty())
+                    "${sortedSamples.first().nanoTime} to ${sortedSamples.last().nanoTime}"
+                else "empty"
+            }")
+
+            return sortedSamples
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing accelerometer data: ${e.message}", e)
+            throw e
+        }
+    }
     private fun loadTFLiteModel() {
         val modelFile = PrefsHelper.getModelFile(this)
         Thread {

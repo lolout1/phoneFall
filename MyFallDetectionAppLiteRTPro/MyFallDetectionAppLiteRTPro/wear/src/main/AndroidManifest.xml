@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <!-- Specify this is a watch app -->
     <uses-feature android:name="android.hardware.type.watch" />
@@ -21,6 +22,7 @@
         <meta-data
             android:name="com.google.android.wearable.standalone"
             android:value="true" />
+
         <activity
             android:name=".WatchMainActivity"
             android:exported="true">
@@ -30,7 +32,23 @@
             </intent-filter>
         </activity>
 
-        <!-- Services remain the same -->
-        <!-- ... -->
+        <!-- Watch sensor service -->
+        <service android:name=".WatchSensorService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
+        <!-- Watch message listener service -->
+        <service android:name=".WatchWearListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/start_on_watch" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/stop_on_watch" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/config_update" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/status_request" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/predict_update" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/phone_command" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
