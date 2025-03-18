@@ -41,4 +41,6 @@
     <string name="btn_delete_logs_desc">Tap to delete log files</string>
     <string name="tv_stats_label">Stats:</string>
     <string name="tv_stats_desc">Displays computed statistics for sensor runs</string>
+    <string name="save_configuration">Save Configuration</string>
+    <item name="tvCurrentConfig" type="id" />
 </resources>

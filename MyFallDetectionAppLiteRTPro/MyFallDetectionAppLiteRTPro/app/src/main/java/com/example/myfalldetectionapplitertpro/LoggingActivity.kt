@@ -22,15 +22,11 @@ class LoggingActivity : AppCompatActivity() {
         btnComputeStats = findViewById(R.id.btnComputeStats)
         btnDeleteLogs = findViewById(R.id.btnDeleteLogs)
 
-        // Load logs on activity start
         loadLogs()
 
         btnComputeStats.setOnClickListener {
-            // Compute and display stats if desired.
-            // For simplicity, here we simply append a placeholder.
-            etLogs.append("\n[Stats Computed]")
+            etLogs.append("\n[Compute Stats Stub]")
         }
-
         btnDeleteLogs.setOnClickListener {
             deleteLogs()
             etLogs.setText("")
@@ -40,12 +36,7 @@ class LoggingActivity : AppCompatActivity() {
     private fun loadLogs() {
         try {
             val file = File(getExternalFilesDir(null), "run_log.txt")
-            if (file.exists()) {
-                val content = file.readText()
-                etLogs.setText(content)
-            } else {
-                etLogs.setText("No logs found.")
-            }
+            etLogs.setText(if (file.exists()) file.readText() else "No logs found.")
         } catch (e: Exception) {
             Log.e(TAG, "Error loading logs", e)
             etLogs.setText("Error loading logs.")
@@ -55,9 +46,7 @@ class LoggingActivity : AppCompatActivity() {
     private fun deleteLogs() {
         try {
             val file = File(getExternalFilesDir(null), "run_log.txt")
-            if (file.exists()) {
-                file.delete()
-            }
+            if (file.exists()) file.delete()
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting logs", e)
         }

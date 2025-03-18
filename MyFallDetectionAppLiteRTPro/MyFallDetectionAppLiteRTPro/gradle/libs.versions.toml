@@ -14,6 +14,8 @@ databindingCompiler = "8.8.1"
 databindingRuntime = "8.8.1"
 baselibrary = "8.8.1"
 databindingAdapters = "8.8.1"
+wear = "1.3.0"
+playServicesTasks = "18.0.1"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "android-gradlePlugin" }
@@ -32,3 +34,5 @@ databinding-compiler = { group = "androidx.databinding", name = "databinding-com
 databinding-runtime = { group = "androidx.databinding", name = "databinding-runtime", version.ref = "databindingRuntime" }
 baselibrary = { group = "com.android.databinding", name = "baseLibrary", version.ref = "baselibrary" }
 databinding-adapters = { group = "androidx.databinding", name = "databinding-adapters", version.ref = "databindingAdapters" }
+wear = { group = "androidx.wear", name = "wear", version.ref = "wear" }
+play-services-tasks = { group = "com.google.android.gms", name = "play-services-tasks", version.ref = "playServicesTasks" }

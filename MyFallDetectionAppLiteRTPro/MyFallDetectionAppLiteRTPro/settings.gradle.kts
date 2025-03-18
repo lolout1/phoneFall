@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "MyFallDetectionAppLiteRTPro"
-include(":app")
+include(":app", ":wear")

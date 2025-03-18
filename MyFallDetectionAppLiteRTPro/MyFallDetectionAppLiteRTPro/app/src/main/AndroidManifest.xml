@@ -1,47 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Accelerometer feature is required -->
-    <uses-feature
-        android:name="android.hardware.sensor.accelerometer"
-        android:required="true" />
-
-    <!-- Basic permissions -->
-    <uses-permission android:name="android.permission.VIBRATE"/>
-    <!-- Storage permissions are no longer needed for app‑specific files -->
-    <!-- Notification permission for Android 13+ -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- Foreground service permissions -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH"/>
-    <!-- Sensor permission (required for health-type services) -->
-    <uses-permission android:name="android.permission.BODY_SENSORS"/>
+    <!-- Required permissions for the phone app -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
 
     <application
         android:allowBackup="true"
         android:label="@string/app_name"
-        android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- Main (phone) activity -->
         <activity
-            android:name=".HomeActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- Logging activity -->
         <activity
             android:name=".LoggingActivity"
             android:exported="true"
             android:label="@string/logs_title" />
 
+        <!-- Background service for fall detection -->
         <service
             android:name=".BackgroundFallService"
             android:exported="false"
             android:foregroundServiceType="health" />
+
+        <!-- Wearable listener service to receive messages from the watch -->
+        <service
+            android:name=".wearintegration.PhoneWearListenerService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/watch_accel_data" />
+            </intent-filter>
+        </service>
 
     </application>
 </manifest>

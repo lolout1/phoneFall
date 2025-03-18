@@ -11,17 +11,6 @@ import org.tensorflow.lite.support.common.FileUtil
 import java.nio.MappedByteBuffer
 import kotlin.math.exp
 
-/**
- * A robust TFLite helper class using the Google Play Services LiteRT runtime.
- *
- * Model input shapes:
- *   - Input 0: [1, 128] (time)
- *   - Input 1: [1, 128, 3] (accelerometer)
- *   - Input 2: [1, 128] (mask)
- *
- * The output is [1, 2] representing logits for "no_fall" and "fall".
- * Softmax is applied to compute the fall probability.
- */
 class TFLiteLiteRT(context: Context, modelFileName: String) {
     private var interpreter: InterpreterApi? = null
     private var modelLoaded = false
@@ -42,34 +31,25 @@ class TFLiteLiteRT(context: Context, modelFileName: String) {
     }
 
     fun logInputShapes() {
-        if (!modelLoaded || interpreter == null) {
-            Log.w("TFLiteLiteRT", "Interpreter not loaded; cannot log input shapes.")
-            return
-        }
+        if (!modelLoaded || interpreter == null) return
         try {
-            val inputCount = interpreter!!.getInputTensorCount()
-            for (i in 0 until inputCount) {
-                val tensor = interpreter!!.getInputTensor(i)
-                val shape = tensor.shape()
-                Log.d("TFLiteLiteRT", "Input $i shape: [${shape.joinToString()}]")
+            val count = interpreter!!.getInputTensorCount()
+            for (i in 0 until count) {
+                val shape = interpreter!!.getInputTensor(i).shape()
+                Log.d("TFLiteLiteRT", "Input $i shape=[${shape.joinToString()}]")
             }
         } catch (e: Exception) {
             Log.e("TFLiteLiteRT", "Error retrieving input shapes", e)
         }
     }
 
-    fun runInference(
-        timeArr: FloatArray,
-        xyzArr: Array<FloatArray>,
-        maskArr: FloatArray
-    ): Float {
+    fun runInference(timeArr: FloatArray, xyzArr: Array<FloatArray>, maskArr: FloatArray): Float {
         if (!modelLoaded || interpreter == null) {
             Log.e("TFLiteLiteRT", "Interpreter not loaded. Cannot run inference.")
             return -9999f
         }
-        Log.d("TFLiteLiteRT", "runInference called with: timeArr.size=${timeArr.size}, xyzArr.size=${xyzArr.size}, maskArr.size=${maskArr.size}")
-        if (timeArr.size != 128 || maskArr.size != 128 || xyzArr.size != 128) {
-            Log.e("TFLiteLiteRT", "Input arrays must have length 128.")
+        if (timeArr.size != xyzArr.size || xyzArr.size != maskArr.size) {
+            Log.e("TFLiteLiteRT", "Input arrays must have same length.")
             return -9999f
         }
         val inputTime = arrayOf(timeArr)
@@ -78,7 +58,6 @@ class TFLiteLiteRT(context: Context, modelFileName: String) {
         val outputArr = Array(1) { FloatArray(2) }
         val outputs = mutableMapOf<Int, Any>(0 to outputArr)
         val inputs = arrayOf<Any>(inputTime, inputXYZ, inputMask)
-
         return try {
             interpreter!!.runForMultipleInputsOutputs(inputs, outputs)
             val logits = outputArr[0]

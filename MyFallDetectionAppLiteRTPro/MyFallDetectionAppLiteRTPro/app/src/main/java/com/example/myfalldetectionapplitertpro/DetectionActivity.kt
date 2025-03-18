@@ -8,6 +8,7 @@ import android.util.Log
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -17,7 +18,6 @@ class DetectionActivity : AppCompatActivity() {
 
     private val TAG = "DetectionActivity"
 
-    // UI
     private lateinit var btnStart: Button
     private lateinit var tvActivated: TextView
     private lateinit var tvStopwatch: TextView
@@ -26,25 +26,21 @@ class DetectionActivity : AppCompatActivity() {
     private lateinit var tvHistory: TextView
     private lateinit var scrollView: ScrollView
 
-    // State for stopwatch
     private var isRunning = false
     private var startMs: Long = 0L
 
-    // Keep a small list of recent predictions
     private val predictionsHistory = mutableListOf<String>()
-
     private val uiHandler = Handler(Looper.getMainLooper())
     private val updateStopwatchRunnable = object : Runnable {
         override fun run() {
             if (isRunning) {
                 val elapsed = System.currentTimeMillis() - startMs
-                tvStopwatch.text = "Stopwatch: $elapsed ms"
+                tvStopwatch.text = "Stopwatch: ${elapsed} ms"
                 uiHandler.postDelayed(this, 100)
             }
         }
     }
 
-    // BroadcastReceiver to handle inference results from service
     private val inferenceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -52,7 +48,12 @@ class DetectionActivity : AppCompatActivity() {
                     val label = intent.getStringExtra(BackgroundFallService.EXTRA_LABEL) ?: "N/A"
                     val probability = intent.getFloatExtra(BackgroundFallService.EXTRA_PROBABILITY, -9999f)
                     Log.d(TAG, "Received inference: $label (prob=$probability)")
-                    updateInferenceUI(label, probability)
+                    tvPrediction.text = label
+                    tvProbability.text = "Probability: %.3f".format(probability)
+                    predictionsHistory.add("$label (%.3f)".format(probability))
+                    if (predictionsHistory.size > 8) predictionsHistory.removeAt(0)
+                    tvHistory.text = predictionsHistory.joinToString("\n")
+                    scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
                 }
                 BackgroundFallService.ACTION_FALL_DETECTED -> {
                     Log.d(TAG, "Fall detected broadcast")
@@ -62,27 +63,27 @@ class DetectionActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateInferenceUI(label: String, probability: Float) {
-        tvPrediction.text = label
-        tvProbability.text = "Probability: %.3f".format(probability)
-
-        // Keep last 8 predictions in history
-        predictionsHistory.add("$label (%.3f)".format(probability))
-        if (predictionsHistory.size > 8) {
-            predictionsHistory.removeAt(0)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    override fun onResume() {
+        super.onResume()
+        val filter = IntentFilter().apply {
+            addAction(BackgroundFallService.ACTION_INFERENCE_RESULT)
+            addAction(BackgroundFallService.ACTION_FALL_DETECTED)
         }
-        tvHistory.text = predictionsHistory.joinToString("\n")
+        // Mark receiver as not exported.
+        registerReceiver(inferenceReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+    }
 
-        // Auto scroll
-        scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+    override fun onPause() {
+        super.onPause()
+        unregisterReceiver(inferenceReceiver)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)  // Reuse your activity_main.xml
+        setContentView(R.layout.activity_main)  // Reusing activity_main.xml
         Log.d(TAG, "onCreate")
 
-        // Bind UI
         btnStart = findViewById(R.id.btnStart)
         tvActivated = findViewById(R.id.tvActivated)
         tvStopwatch = findViewById(R.id.tvStopwatch)
@@ -91,7 +92,6 @@ class DetectionActivity : AppCompatActivity() {
         tvHistory = findViewById(R.id.tvPredictionsHistory)
         scrollView = findViewById(R.id.scrollViewPredictions)
 
-        // Button toggles start/stop
         btnStart.setOnClickListener {
             if (!isRunning) {
                 startCapture()
@@ -100,24 +100,7 @@ class DetectionActivity : AppCompatActivity() {
             }
         }
 
-        // Check storage permission on older devices
         checkStoragePermissionIfNeeded()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // Register broadcast receiver
-        val filter = IntentFilter().apply {
-            addAction(BackgroundFallService.ACTION_INFERENCE_RESULT)
-            addAction(BackgroundFallService.ACTION_FALL_DETECTED)
-        }
-        registerReceiver(inferenceReceiver, filter)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        // Unregister
-        unregisterReceiver(inferenceReceiver)
     }
 
     private fun startCapture() {
@@ -129,15 +112,10 @@ class DetectionActivity : AppCompatActivity() {
         tvProbability.text = "Probability: -"
         tvHistory.text = ""
         predictionsHistory.clear()
-
-        // Start service with action START_CAPTURE
         val intent = Intent(this, BackgroundFallService::class.java).apply {
             action = "START_CAPTURE"
         }
-        // For Android 8.0+ you must use startForegroundService
         ContextCompat.startForegroundService(this, intent)
-
-        // Start stopwatch
         uiHandler.post(updateStopwatchRunnable)
     }
 
@@ -146,9 +124,7 @@ class DetectionActivity : AppCompatActivity() {
         tvActivated.text = "Not Activated"
         uiHandler.removeCallbacks(updateStopwatchRunnable)
         val elapsed = System.currentTimeMillis() - startMs
-        tvStopwatch.text = "Stopwatch: $elapsed ms"
-
-        // Send STOP_CAPTURE to service
+        tvStopwatch.text = "Stopwatch: ${elapsed} ms"
         val intent = Intent(this, BackgroundFallService::class.java).apply {
             action = "STOP_CAPTURE"
         }
@@ -164,9 +140,6 @@ class DetectionActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Called when the service broadcasts ACTION_FALL_DETECTED
-     */
     private fun showFallDetectedDialog() {
         if (!isFinishing) {
             AlertDialog.Builder(this)
@@ -175,7 +148,6 @@ class DetectionActivity : AppCompatActivity() {
                 .setCancelable(false)
                 .setPositiveButton("OK") { dialog, _ ->
                     dialog.dismiss()
-                    // Optionally restart capturing
                     startCapture()
                 }
                 .show()
