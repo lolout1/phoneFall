@@ -50,5 +50,10 @@ dependencies {
     // Coroutines for async operations
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.6.4")
+    implementation("com.google.android.gms:play-services-wearable:18.0.0")
 
+    // GMS TensorFlow Lite dependencies
+    implementation("com.google.android.gms:play-services-tflite-java:16.1.0")
+    implementation("com.google.android.gms:play-services-tflite-support:16.1.0")
+    implementation("com.google.android.gms:play-services-tasks:18.0.2")
 }

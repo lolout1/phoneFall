@@ -291,13 +291,25 @@ class InferenceFragment : Fragment() {
     /**
      * Registers a broadcast receiver with compatibility for all Android versions.
      * This method handles the different API signatures to avoid type mismatches.
+     *
+     * FIXED: Added proper handling for Android 13+ (API 33+) with explicit RECEIVER_NOT_EXPORTED flag.
      */
     private fun registerReceiverCompat(receiver: BroadcastReceiver, filter: IntentFilter) {
-        // FIX: Use RECEIVER_NOT_EXPORTED flag for Android 12+ (API level 31+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requireContext().registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            requireContext().registerReceiver(receiver, filter)
+        try {
+            // Use the explicit API level check to ensure compatibility
+            if (Build.VERSION.SDK_INT >= 33) { // Android 13 (API 33) or higher - requires export flag
+                Log.d(TAG, "Registering receiver with RECEIVER_NOT_EXPORTED flag (Android 13+)")
+                requireContext().registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                // For Android 12 and below - no export flag needed
+                Log.d(TAG, "Registering receiver without export flag (pre-Android 13)")
+                requireContext().registerReceiver(receiver, filter)
+            }
+            Log.d(TAG, "Successfully registered receiver for ${filter.actionsIterator().asSequence().joinToString()}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering receiver: ${e.message}", e)
+            // Show error toast so the user knows something went wrong
+            Toast.makeText(context, "App initialization error. Please restart.", Toast.LENGTH_LONG).show()
         }
     }
 
