@@ -1,4 +1,6 @@
-# phoneFall
+# phoneFall 
+
+Model training can be found: https://github.com/lolout1/LightHART 
 
 
 Current implemenation features fall detection model running on phone accelerometer and/or gyroscope data. Watch accelerometer/gyroscope data inference will be implemented in the near future where watch sensor values are sent to phone for processing so that GPU/computational pre-processing can be applied (e.g. sensor fusion, orientation estimation, interpolation, etc.) 
